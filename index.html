@@ -1,0 +1,256 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ÉTOILE TAROT | 星が導くタロット</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;
+ background:radial-gradient(ellipse at top,#30304e,#111321 75%);
+ color:#f5ecdf;
+ font-family:Georgia,"Yu Mincho",serif;
+ min-height:100vh;
+ text-align:center;
+}
+main{max-width:650px;margin:auto;padding:42px 18px 80px}
+.logo{font-size:26px;letter-spacing:4px;color:#e8cb91}
+.sub{font-size:12px;letter-spacing:3px;color:#c7b79d;margin:12px 0 35px}
+h1{font-size:23px;font-weight:normal}
+p{line-height:1.9}
+.note{font-size:13px;color:#c9c2c0}
+button{
+ cursor:pointer;
+ background:#c6a36b;
+ color:#171524;
+ border:0;
+ border-radius:30px;
+ padding:13px 28px;
+ font-size:15px;
+ font-family:inherit;
+}
+button:disabled{opacity:.45;cursor:default}
+#deck{
+ display:grid;
+ grid-template-columns:repeat(5,minmax(0,1fr));
+ gap:12px;
+ margin:32px auto;
+ max-width:520px;
+}
+.card{
+ aspect-ratio:2/3.4;
+ border:2px solid #d6b87e;
+ border-radius:8px;
+ background:
+ radial-gradient(circle,#c7a86d 1px,transparent 2px),
+ linear-gradient(145deg,#3c385e,#191a35);
+ background-size:16px 16px,auto;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ color:#e6cf9f;
+ position:relative;
+ box-shadow:0 4px 12px #0005;
+ transition:transform .2s;
+ padding:0;
+ min-width:0;
+}
+.card:before{
+ content:"✦";
+ font-size:26px;
+ border:1px solid #c7a86d;
+ border-radius:50%;
+ width:55%;
+ aspect-ratio:1;
+ display:grid;
+ place-items:center;
+}
+.card.selected{
+ outline:3px solid #fff1c2;
+ transform:translateY(-8px);
+}
+.card.selected:after{
+ content:"✓";
+ position:absolute;
+ top:-10px;right:-8px;
+ background:#e9d3a2;color:#191727;
+ border-radius:50%;
+ width:25px;height:25px;
+ line-height:25px;
+ font-size:16px;
+}
+#status{min-height:28px;color:#e7d0a5}
+#results{display:none;margin-top:35px}
+.result{
+ border:1px solid #947a58;
+ border-radius:12px;
+ background:#ffffff0b;
+ padding:22px 15px;
+ margin:18px 0;
+}
+.result h2{font-size:18px;font-weight:normal;color:#e8ca90}
+.face{
+ width:120px;height:190px;
+ margin:18px auto;
+ border:3px double #d8b77b;
+ border-radius:8px;
+ background:#f0e5d3;
+ color:#30283a;
+ display:flex;
+ flex-direction:column;
+ align-items:center;
+ justify-content:center;
+ gap:15px;
+ padding:10px;
+}
+.face .symbol{font-size:45px}
+.reversed .face{transform:rotate(180deg)}
+#startArea{margin:35px 0}
+.hidden{display:none!important}
+footer{margin-top:60px;font-size:12px;color:#a99b8b}
+</style>
+</head>
+<body>
+<main>
+<div class="logo">✦ ÉTOILE TAROT ✦</div>
+<div class="sub">TAROT READING & GUIDANCE</div>
+
+<section id="intro">
+<h1>星が導く、あなただけの物語</h1>
+<p>心を静かにして、今のあなたが知りたいことを思い浮かべてください。</p>
+<p class="note">カードを7回シャッフルしたあと、直感で3枚お選びいただきます。</p>
+<div id="startArea">
+<button id="start">鑑定をはじめる</button>
+</div>
+</section>
+
+<section id="reading" class="hidden">
+<h1>心のままに、3枚を選んで</h1>
+<p class="note">1枚目は過去、2枚目は現在、3枚目は未来を表します。</p>
+<p id="status"></p>
+<div id="deck"></div>
+<button id="reveal" disabled>カードを開く</button>
+</section>
+
+<section id="results">
+<h1>あなたへのメッセージ</h1>
+<p class="note">3枚のカードが映し出す、あなたの物語。</p>
+<div id="resultCards"></div>
+<p class="note">カードは未来を決めるものではなく、あなた自身を見つめるための道しるべです。</p>
+</section>
+
+<footer>ÉTOILE TAROT © 2026</footer>
+</main>
+
+<script>
+const cards=[
+ ["愚者","✧"],["魔術師","✦"],["女教皇","☾"],
+ ["女帝","❀"],["皇帝","♜"],["教皇","✝"],
+ ["恋人","♡"],["戦車","♞"],["力","♌"],
+ ["隠者","✶"],["運命の輪","☼"],["正義","⚖"],
+ ["吊るされた男","◇"],["死神","✝"],["節制","♒"],
+ ["悪魔","♄"],["塔","♜"],["星","☆"],
+ ["月","☽"],["太陽","☀"],["審判","♬"],
+ ["世界","◎"]
+];
+const meanings=[
+ "新しい可能性を信じて、一歩踏み出すとき。",
+ "あなたの持つ力を、行動に変えるとき。",
+ "静かな直感が、大切な答えを教えてくれます。",
+ "豊かさや愛情を受け取ることを大切に。",
+ "自分の意志と責任を信じて進みましょう。",
+ "信頼できる教えや助言に目を向けて。",
+ "心が本当に望む選択を大切に。",
+ "迷いを越えて前進する力があります。",
+ "優しさと忍耐が強さになります。",
+ "一人で考える時間が気づきをもたらします。",
+ "流れが変わるタイミングを受け入れて。",
+ "公平な視点で自分の選択を見つめて。",
+ "違う角度から見ることで答えが見つかります。",
+ "終わりは新しい始まりにつながります。",
+ "焦らず調和を取り戻すことが大切です。",
+ "自分を縛る思い込みに気づいて。",
+ "変化の中に新しい可能性があります。",
+ "希望の光は、あなたの中にあります。",
+ "不安の奥にある本当の気持ちを見つめて。",
+ "喜びや明るい展開に心を開いて。",
+ "過去の経験から新しい気づきが生まれます。",
+ "一つの区切りと達成が近づいています。"
+];
+let deck=[],chosen=[],started=false;
+const $=id=>document.getElementById(id);
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function shuffle(a){
+ for(let i=a.length-1;i>0;i--){
+  const j=Math.floor(Math.random()*(i+1));
+  [a[i],a[j]]=[a[j],a[i]];
+ }
+}
+$("start").onclick=async()=>{
+ if(started)return;
+ started=true;
+ $("start").disabled=true;
+ $("reading").classList.remove("hidden");
+ $("startArea").classList.add("hidden");
+ $("status").textContent="星の導きを受け取っています…";
+ deck=cards.map((c,i)=>({name:c[0],symbol:c[1],meaning:meanings[i],reversed:Math.random()<.5}));
+ for(let i=1;i<=7;i++){
+  shuffle(deck);
+  $("status").textContent=`シャッフル中… ${i} / 7`;
+  await wait(330);
+ }
+ $("status").textContent="直感で3枚のカードを選んでください（0 / 3）";
+ const area=$("deck");
+ deck.forEach((card,i)=>{
+  const b=document.createElement("button");
+  b.className="card";
+  b.type="button";
+  b.setAttribute("aria-label",`カード ${i+1}`);
+  b.onclick=()=>{
+   if(chosen.includes(i)){
+    chosen=chosen.filter(x=>x!==i);
+    b.classList.remove("selected");
+   }else if(chosen.length<3){
+    chosen.push(i);
+    b.classList.add("selected");
+   }
+   $("status").textContent=`選択したカード：${chosen.length} / 3`;
+   $("reveal").disabled=chosen.length!==3;
+  };
+  area.appendChild(b);
+ });
+};
+$("reveal").onclick=()=>{
+ if(chosen.length!==3)return;
+ $("reading").classList.add("hidden");
+ $("results").style.display="block";
+ const positions=["過去","現在","未来"];
+ const target=$("resultCards");
+ chosen.forEach((index,i)=>{
+  const card=deck[index];
+  const section=document.createElement("div");
+  section.className="result"+(card.reversed?" reversed":"");
+  const title=document.createElement("h2");
+  title.textContent=`${positions[i]} ─ ${card.name}（${card.reversed?"逆位置":"正位置"}）`;
+  const face=document.createElement("div");
+  face.className="face";
+  const symbol=document.createElement("div");
+  symbol.className="symbol";
+  symbol.textContent=card.symbol;
+  const name=document.createElement("div");
+  name.textContent=card.name;
+  face.append(symbol,name);
+  const meaning=document.createElement("p");
+  meaning.textContent=card.reversed
+   ?"今は焦らず、自分の心と状況を丁寧に見つめることが大切です。"+card.meaning
+   :card.meaning;
+  section.append(title,face,meaning);
+  target.appendChild(section);
+ });
+ window.scrollTo({top:0,behavior:"smooth"});
+};
+</script>
+</body>
+</html>
