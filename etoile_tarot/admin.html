@@ -1,0 +1,209 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ÉTOILE TAROT | 管理画面</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101525;color:#f5f0e6;font-family:"Yu Gothic",Meiryo,sans-serif}
+main{max-width:480px;margin:55px auto;padding:28px}
+.logo{text-align:center;color:#d6bb80;letter-spacing:3px;font-family:Georgia,serif;font-size:25px}
+.sub{text-align:center;color:#aaa4b5;font-size:12px;letter-spacing:2px;margin:10px 0 35px}
+.panel{background:#1c2335;border:1px solid #514768;border-radius:15px;padding:27px}
+h2{font-size:18px;font-weight:500;margin:0 0 22px}
+label{display:block;font-size:13px;color:#d6c9b2;margin:18px 0 8px}
+input{width:100%;padding:14px;background:#101525;border:1px solid #655d72;border-radius:7px;color:white;font-size:15px}
+button{width:100%;padding:15px;margin-top:22px;border:0;border-radius:8px;background:#d4b778;color:#172033;font-size:15px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}
+.secondary{background:transparent;color:#d4b778;border:1px solid #786b54}
+.note{color:#b7b0c1;font-size:12px;line-height:1.8}
+#message{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin-top:20px}
+#result{display:none;margin-top:22px}
+#url{font-size:12px;line-height:1.7}
+.check{display:flex;align-items:flex-start;gap:10px;margin-top:20px;font-size:13px;line-height:1.7}
+.check input{width:auto;margin-top:5px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<div class="logo">ÉTOILE TAROT</div>
+<div class="sub">ADMINISTRATION</div>
+
+<section class="panel" id="loginPanel">
+<h2>管理者ログイン</h2>
+<label>メールアドレス</label>
+<input id="email" type="email" autocomplete="username">
+<label>パスワード</label>
+<input id="password" type="password" autocomplete="current-password">
+<button id="loginBtn">ログイン</button>
+</section>
+
+<section class="panel" id="adminPanel" hidden>
+<h2>鑑定URL発行</h2>
+<p class="note">銀行への入金を確認してから発行してください。</p>
+
+<label>注文番号</label>
+<input id="orderId" placeholder="例：ET-20261027-001" maxlength="80">
+
+<label class="check">
+<input id="confirmed" type="checkbox">
+<span>銀行口座で入金を確認しました</span>
+</label>
+
+<button id="issueBtn">入金確認・専用URL発行</button>
+
+<div id="result">
+<label>お客様専用URL</label>
+<input id="url" readonly>
+<button id="copyBtn">URLをコピー</button>
+<p class="note">有効期限：発行から30日間</p>
+</div>
+
+<button class="secondary" id="logoutBtn">ログアウト</button>
+</section>
+
+<div id="message" role="status"></div>
+</main>
+
+<script>
+const SUPABASE_URL =
+  "https://hvmkxkfjqtxtjqammkgi.supabase.co";
+
+// ここだけ自分のSupabaseの公開キーに置き換える
+const PUBLISHABLE_KEY = "sb_publishable_Ma5LOKsNqKA_DXFSAv97ag_ECuszNqI";
+
+const $ = id => document.getElementById(id);
+let accessToken = "";
+
+function message(text, error = false) {
+  $("message").textContent = text;
+  $("message").style.color = error ? "#ffaaa9" : "#d4b778";
+}
+
+async function login() {
+  $("loginBtn").disabled = true;
+  message("ログイン中…");
+
+  try {
+    const res = await fetch(
+      SUPABASE_URL + "/auth/v1/token?grant_type=password",
+      {
+        method: "POST",
+        headers: {
+          "apikey": PUBLISHABLE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: $("email").value.trim(),
+          password: $("password").value
+        })
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.access_token) {
+      throw new Error("メールアドレスまたはパスワードを確認してください");
+    }
+
+    accessToken = data.access_token;
+    $("password").value = "";
+    $("loginPanel").hidden = true;
+    $("adminPanel").hidden = false;
+    message("ログインしました");
+
+  } catch (err) {
+    message(err.message, true);
+  } finally {
+    $("loginBtn").disabled = false;
+  }
+}
+
+async function issue() {
+  const orderId = $("orderId").value.trim();
+
+  if (!/^[A-Za-z0-9_-]{1,80}$/.test(orderId)) {
+    message("注文番号を半角英数字・ハイフンで入力してください", true);
+    return;
+  }
+
+  if (!$("confirmed").checked) {
+    message("銀行への入金確認にチェックしてください", true);
+    return;
+  }
+
+  if (!confirm(
+    "注文番号：" + orderId +
+    "\n銀行への入金を確認済みとして、専用URLを発行しますか？"
+  )) return;
+
+  $("issueBtn").disabled = true;
+  $("result").style.display = "none";
+  message("URLを発行しています…");
+
+  try {
+    const res = await fetch(
+      SUPABASE_URL + "/functions/v1/admin-issue-tarot-link",
+      {
+        method: "POST",
+        headers: {
+          "apikey": PUBLISHABLE_KEY,
+          "Authorization": "Bearer " + accessToken,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({order_id: orderId})
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      const errors = {
+        "Link already issued": "この注文番号には既にURLが発行されています",
+        "Admin only": "管理者権限がありません",
+        "Invalid login": "ログインが無効です。再ログインしてください",
+        "Payment not confirmed": "入金未確認の注文です",
+        "Could not create order": "注文の登録に失敗しました",
+        "Could not issue link": "URLの発行に失敗しました"
+      };
+      throw new Error(errors[data.error] || data.error || "発行できませんでした");
+    }
+
+    $("url").value = data.url;
+    $("result").style.display = "block";
+    message("専用URLを発行しました！");
+
+  } catch (err) {
+    message(err.message, true);
+  } finally {
+    $("issueBtn").disabled = false;
+  }
+}
+
+$("loginBtn").onclick = login;
+$("issueBtn").onclick = issue;
+
+$("copyBtn").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($("url").value);
+    message("URLをコピーしました。LINEに貼り付けて送信してください");
+  } catch {
+    $("url").select();
+    message("URLを選択しました。Ctrl+Cでコピーしてください");
+  }
+};
+
+$("logoutBtn").onclick = () => {
+  accessToken = "";
+  $("url").value = "";
+  $("result").style.display = "none";
+  $("adminPanel").hidden = true;
+  $("loginPanel").hidden = false;
+  message("ログアウトしました");
+};
+</script>
+</body>
+</html>
